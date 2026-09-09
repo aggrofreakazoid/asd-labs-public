@@ -1,0 +1,15 @@
+{
+  "id": "r1",
+  "title": "Анализ журнала сессий",
+  "io": "args",
+  "compare": "tokens",
+  "run_timeout_sec": 10,
+  "build_timeout_sec": 120,
+  "tests_public": "tests/public",
+  "tests_robustness": "tests/robustness",
+  "bench": {
+    "generator": "gen.py",
+    "sizes": [2000, 4000, 8000, 16000, 32000, 64000],
+    "expected": "n"
+  }
+}

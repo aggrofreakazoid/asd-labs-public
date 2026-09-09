@@ -1,0 +1,4 @@
+LOGIN alice
+LOGIN bob
+LOGOUT bob
+LOGOUT alice
