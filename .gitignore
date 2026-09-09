@@ -1,0 +1,20 @@
+# артефакты сборки и запуска
+.idea
+.check_tmp/
+*.produced
+solution
+*.o
+*.obj
+*.exe
+__pycache__/
+*.pyc
+
+# решение студента (создаётся локально, не коммитится в шаблон)
+solution.json
+
+# ПРИВАТНОЕ преподавателя — никогда не коммитить в публичный репозиторий:
+reference.*
+main.cpp
+*_reference.*
+tests/hidden/
+TEACHER.md
