@@ -71,6 +71,23 @@ def run_argv(argv, **kw):
     kw.setdefault("errors", "replace")
     return subprocess.run(argv, **kw)
 
+def resolve_local_exe(argv, workdir):
+    """Если argv[0] указывает на файл, реально лежащий в workdir (в том
+    числе относительным именем вроде "solution.exe" или "./solution"),
+    подставляет абсолютный путь.
+
+    Нужно из-за особенности Windows: CreateProcess ищет имя программы без
+    явного пути в текущей директории ПРОЦЕССА-РОДИТЕЛЯ (то есть самого
+    check.py), а не в workdir, который мы передаём дочернему процессу
+    параметром cwd — тот определяет только откуда стартует уже найденный
+    процесс. """
+    if not argv:
+        return argv
+    candidate = Path(workdir) / argv[0]
+    if candidate.is_file():
+        return [str(candidate.resolve())] + argv[1:]
+    return argv
+
 # ------------------------------------------------------------------ сборка
 
 def build(manifest, workdir):
@@ -80,7 +97,8 @@ def build(manifest, workdir):
         return True
     print(f"  сборка: {C.dim}{cmd}{C.off}")
     try:
-        r = run_argv(split_cmd(cmd), cwd=workdir, capture_output=True,
+        argv = resolve_local_exe(split_cmd(cmd), workdir)
+        r = run_argv(argv, cwd=workdir, capture_output=True,
                      text=True, timeout=manifest.get("build_timeout_sec", 120))
     except subprocess.TimeoutExpired:
         failed("сборка не уложилась в лимит времени")
@@ -105,7 +123,7 @@ def run_once(manifest, lab, workdir, in_path, out_path, timeout):
         die("в solution.json не задана команда run")
 
     io = lab.get("io", "args")
-    argv = split_cmd(run_tmpl)
+    argv = resolve_local_exe(split_cmd(run_tmpl), workdir)
     try:
         if io == "args":
             r = run_argv(argv + [str(in_path), str(out_path)], cwd=workdir,
