@@ -53,6 +53,24 @@ def load_json(path, what):
     except json.JSONDecodeError as e:
         die(f"{what} содержит некорректный JSON: {e}")
 
+# ------------------------------------------------------------------ кроссплатформенный запуск процессов
+
+def split_cmd(s):
+    return shlex.split(s, posix=(os.name != "nt"))
+
+def is_crash(returncode):
+    if returncode < 0:
+        return True  # POSIX: завершён сигналом
+    if os.name == "nt" and returncode >= 0x80000000:
+        return True  # Windows: NTSTATUS-код исключения (например, access violation)
+    return False
+
+def run_argv(argv, **kw):
+    """subprocess.run с общими для проекта настройками (без shell=True)."""
+    kw.setdefault("encoding", "utf-8")
+    kw.setdefault("errors", "replace")
+    return subprocess.run(argv, **kw)
+
 # ------------------------------------------------------------------ сборка
 
 def build(manifest, workdir):
@@ -62,10 +80,13 @@ def build(manifest, workdir):
         return True
     print(f"  сборка: {C.dim}{cmd}{C.off}")
     try:
-        r = subprocess.run(cmd, shell=True, cwd=workdir, capture_output=True,
-                           text=True, timeout=manifest.get("build_timeout_sec", 120))
+        r = run_argv(split_cmd(cmd), cwd=workdir, capture_output=True,
+                     text=True, timeout=manifest.get("build_timeout_sec", 120))
     except subprocess.TimeoutExpired:
         failed("сборка не уложилась в лимит времени")
+        return False
+    except FileNotFoundError as e:
+        failed(f"команда сборки не найдена: {e}")
         return False
     if r.returncode != 0:
         failed("сборка завершилась с ошибкой")
@@ -84,15 +105,15 @@ def run_once(manifest, lab, workdir, in_path, out_path, timeout):
         die("в solution.json не задана команда run")
 
     io = lab.get("io", "args")
+    argv = split_cmd(run_tmpl)
     try:
         if io == "args":
-            cmd = f"{run_tmpl} {shlex.quote(str(in_path))} {shlex.quote(str(out_path))}"
-            r = subprocess.run(cmd, shell=True, cwd=workdir, capture_output=True,
-                               text=True, timeout=timeout)
+            r = run_argv(argv + [str(in_path), str(out_path)], cwd=workdir,
+                         capture_output=True, text=True, timeout=timeout)
             produced = out_path
         elif io == "stdio":
             with open(in_path, "rb") as fin:
-                r = subprocess.run(run_tmpl, shell=True, cwd=workdir, stdin=fin,
+                r = subprocess.run(argv, cwd=workdir, stdin=fin,
                                    capture_output=True, timeout=timeout)
             out_path.write_bytes(r.stdout)
             produced = out_path
@@ -100,8 +121,11 @@ def run_once(manifest, lab, workdir, in_path, out_path, timeout):
             die(f"неизвестный режим io={io!r} в lab.json (ожидается args или stdio)")
     except subprocess.TimeoutExpired:
         return "timeout", f"превышен лимит {timeout} с"
-    if r.returncode < 0:
-        return "crash", f"аварийное завершение сигналом {-r.returncode}"
+    except FileNotFoundError as e:
+        return "runerror", f"команда не найдена: {e}"
+    if is_crash(r.returncode):
+        detail = f"сигналом {-r.returncode}" if r.returncode < 0 else f"код {r.returncode:#x}"
+        return "crash", f"аварийное завершение ({detail})"
     if r.returncode != 0:
         return "runerror", f"код возврата {r.returncode}"
     return "ok", produced
@@ -116,8 +140,11 @@ def compare(expected_path, produced_path, mode, checker, workdir, in_path):
     if mode == "checker":
         if not checker:
             die("compare=checker, но путь к чекеру не задан в lab.json")
-        cmd = f"{checker} {shlex.quote(str(in_path))} {shlex.quote(str(expected_path))} {shlex.quote(str(produced_path))}"
-        r = subprocess.run(cmd, shell=True, cwd=workdir, capture_output=True, text=True)
+        argv = checker + [str(in_path), str(expected_path), str(produced_path)]
+        try:
+            r = run_argv(argv, cwd=workdir, capture_output=True, text=True)
+        except FileNotFoundError as e:
+            return False, f"чекер не найден: {e}"
         return (r.returncode == 0), (r.stdout.strip() or r.stderr.strip())
 
     exp = Path(expected_path).read_text(encoding="utf-8", errors="replace")
@@ -176,7 +203,8 @@ def run_public(manifest, lab, root, workdir, tests_dir, tmp):
     mode = lab.get("compare", "tokens")
     checker = lab.get("checker")
     if checker:
-        checker = str((root / checker).resolve())
+        checker = split_cmd(checker)
+        checker[0] = str((root / checker[0]).resolve())
     timeouts = 0
     for inp, exp in cases:
         if timeouts >= 3:
@@ -239,8 +267,12 @@ def run_bench(manifest, lab, root, workdir, tmp):
         return {"n": n, "nlogn": n*math.log2(n), "n2": n*n}.get(expected, n)
     for n in sizes:
         inp = tmp / f"bench_{n}.in"
-        r = subprocess.run(f"python3 {shlex.quote(str(gen_path))} {n}",
-                           shell=True, cwd=workdir, capture_output=True, text=True)
+        try:
+            r = run_argv([sys.executable, str(gen_path), str(n)],
+                         cwd=workdir, capture_output=True, text=True)
+        except FileNotFoundError as e:
+            note(f"генератор не найден: {e}")
+            continue
         inp.write_text(r.stdout, encoding="utf-8")
         best = None
         for _ in range(3):
