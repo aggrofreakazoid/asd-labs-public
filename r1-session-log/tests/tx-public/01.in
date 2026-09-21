@@ -1,0 +1,6 @@
+LOGIN alice
+BEGIN
+LOGIN bob
+LOGOUT bob
+ROLLBACK
+LOGOUT alice

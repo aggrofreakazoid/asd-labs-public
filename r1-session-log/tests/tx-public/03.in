@@ -1,0 +1,4 @@
+LOGIN alice
+BEGIN
+LOGOUT alice
+ROLLBACK

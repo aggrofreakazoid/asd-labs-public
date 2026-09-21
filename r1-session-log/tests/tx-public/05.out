@@ -1,0 +1,3 @@
+ERROR 1 transaction_not_closed
+ERROR 2 session_not_closed
+SESSIONS 0
