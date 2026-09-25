@@ -1,0 +1,4 @@
+LOGIN alice
+LOGOUT ghost
+HELLO world
+LOGOUT alice

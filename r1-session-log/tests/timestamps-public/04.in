@@ -1,0 +1,3 @@
+LOGIN alice 10
+LOGOUT ghost 15
+LOGOUT alice 20

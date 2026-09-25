@@ -352,7 +352,7 @@ def main():
         sys.exit(0)
 
     if args.public or run_all:
-        tests_dir = args.tests or (root / lab.get("tests_public", "tests/public"))
+        tests_dir = Path(args.tests).resolve() if args.tests else (root / lab.get("tests_public", "tests/public"))
         o, t = run_public(manifest, lab, root, workdir, tests_dir, tmp)
         total_ok += o; total += t
 

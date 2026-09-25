@@ -1,0 +1,6 @@
+LOGIN alice
+LOGIN bob
+LOGIN carol
+LOGOUT bob
+LOGOUT alice
+LOGOUT carol

@@ -1,0 +1,4 @@
+LOGIN alice 500
+LOGIN bob 500
+LOGOUT alice 500
+LOGOUT bob 500

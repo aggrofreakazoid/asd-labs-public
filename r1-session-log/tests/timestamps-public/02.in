@@ -1,0 +1,4 @@
+LOGIN alice 1000
+LOGIN bob 1005
+LOGOUT alice 1010
+LOGOUT bob 1015

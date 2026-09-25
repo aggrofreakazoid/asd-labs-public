@@ -1,0 +1,3 @@
+LOGIN alice 100
+LOGIN bob 200
+LOGOUT bob 250
