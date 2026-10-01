@@ -8,6 +8,7 @@ solution
 *.exe
 __pycache__/
 *.pyc
+r2-bmp-sort/tools/bmpshuffle/bmpshuffle
 
 # решение студента (создаётся локально, не коммитится в шаблон)
 solution.json

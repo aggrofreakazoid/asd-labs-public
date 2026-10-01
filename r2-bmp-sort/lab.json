@@ -1,0 +1,13 @@
+{
+  "id": "r2",
+  "title": "Восстановление изображения сортировкой",
+  "io": "args",
+  "extra_inputs": {"keys": ".keys.txt"},
+  "arg_template": ["--bmp", "{in}", "--keys", "{keys}", "--out", "{out}"],
+  "compare": "checker",
+  "checker": "check_restore.py",
+  "run_timeout_sec": 10,
+  "build_timeout_sec": 120,
+  "tests_public": "tests/public",
+  "tests_robustness": "tests/robustness"
+}

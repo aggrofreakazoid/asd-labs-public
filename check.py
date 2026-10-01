@@ -115,19 +115,31 @@ def build(manifest, workdir):
 
 # ------------------------------------------------------------------ запуск одного теста
 
-def run_once(manifest, lab, workdir, in_path, out_path, timeout):
+def run_once(manifest, lab, workdir, in_path, out_path, timeout, extras=None):
     """Запускает решение на одном входе. Возвращает (status, detail).
-    status: 'ok' | 'crash' | 'timeout' | 'runerror'."""
+    status: 'ok' | 'crash' | 'timeout' | 'runerror'.
+
+    extras — доп. входные файлы работы (например, файл ключей у р2),
+    заданные в lab.json через extra_inputs; подставляются в arg_template."""
+    extras = extras or {}
     run_tmpl = manifest.get("run", "").strip()
     if not run_tmpl:
         die("в solution.json не задана команда run")
 
     io = lab.get("io", "args")
     argv = resolve_local_exe(split_cmd(run_tmpl), workdir)
+    arg_template = lab.get("arg_template")
     try:
         if io == "args":
-            r = run_argv(argv + [str(in_path), str(out_path)], cwd=workdir,
-                         capture_output=True, text=True, timeout=timeout)
+            if arg_template:
+                fmt = {"in": str(in_path), "out": str(out_path)}
+                fmt.update({k: str(v) for k, v in extras.items()})
+                extra_args = [tok.format(**fmt) for tok in arg_template]
+                r = run_argv(argv + extra_args, cwd=workdir,
+                             capture_output=True, text=True, timeout=timeout)
+            else:
+                r = run_argv(argv + [str(in_path), str(out_path)], cwd=workdir,
+                             capture_output=True, text=True, timeout=timeout)
             produced = out_path
         elif io == "stdio":
             with open(in_path, "rb") as fin:
@@ -201,17 +213,33 @@ def first_diff_line(exp, got):
 
 # ------------------------------------------------------------------ прогоны
 
-def collect_cases(tests_dir):
-    """Пары NN.in / NN.out в каталоге, по возрастанию имени."""
+def collect_cases(tests_dir, extra_inputs=None):
+    """Тройки (NN.in, NN.out, extras) в каталоге, по возрастанию имени.
+
+    extra_inputs — {имя: расширение} из lab.json (например, {"keys":
+    ".keys.txt"} у р2); extras — словарь имя->путь для таких файлов.
+    Кейс, которому не хватает заявленного extra-файла, пропускается."""
+    extra_inputs = extra_inputs or {}
     cases = []
     for inp in sorted(Path(tests_dir).glob("*.in")):
-        out = inp.with_suffix(".out")
-        if out.exists():
-            cases.append((inp, out))
+        out = inp.parent / f"{inp.stem}.out"
+        if not out.exists():
+            continue
+        extras = {}
+        missing = False
+        for name, ext in extra_inputs.items():
+            p = inp.parent / f"{inp.stem}{ext}"
+            if not p.exists():
+                missing = True
+                break
+            extras[name] = p
+        if missing:
+            continue
+        cases.append((inp, out, extras))
     return cases
 
 def run_public(manifest, lab, root, workdir, tests_dir, tmp):
-    cases = collect_cases(tests_dir)
+    cases = collect_cases(tests_dir, lab.get("extra_inputs"))
     if not cases:
         note(f"в {tests_dir} нет тестов вида NN.in/NN.out")
         return 0, 0
@@ -224,12 +252,12 @@ def run_public(manifest, lab, root, workdir, tests_dir, tmp):
         checker = split_cmd(checker)
         checker[0] = str((root / checker[0]).resolve())
     timeouts = 0
-    for inp, exp in cases:
+    for inp, exp, extras in cases:
         if timeouts >= 3:
             note("три таймаута подряд — прекращаю прогон, вероятно бесконечный цикл")
             break
         produced = tmp / (inp.stem + ".produced")
-        status, detail = run_once(manifest, lab, workdir, inp, produced, timeout)
+        status, detail = run_once(manifest, lab, workdir, inp, produced, timeout, extras)
         if status != "ok":
             failed(f"{inp.name}: {detail}")
             timeouts = timeouts + 1 if status == "timeout" else 0
@@ -250,11 +278,23 @@ def run_robustness(manifest, lab, workdir, rob_dir, tmp):
     head(f"Устойчивость к враждебному вводу ({len(inputs)})")
     note("программа обязана не падать и не зависать: допустим любой аккуратный выход,")
     note("недопустимы аварийное завершение сигналом и превышение лимита времени.")
+    extra_inputs = lab.get("extra_inputs") or {}
     ok = 0
     timeout = lab.get("run_timeout_sec", 10)
     for inp in inputs:
+        extras = {}
+        missing = False
+        for name, ext in extra_inputs.items():
+            p = inp.parent / f"{inp.stem}{ext}"
+            if not p.exists():
+                missing = True
+                break
+            extras[name] = p
+        if missing:
+            note(f"{inp.name}: нет сопутствующего файла, пропускаю")
+            continue
         produced = tmp / (inp.stem + ".produced")
-        status, detail = run_once(manifest, lab, workdir, inp, produced, timeout)
+        status, detail = run_once(manifest, lab, workdir, inp, produced, timeout, extras)
         if status in ("ok", "runerror"):
             passed(f"{inp.name}: пережила ({detail if status=='runerror' else 'штатно'})")
             ok += 1

@@ -1,0 +1,6 @@
+{
+  "author": "Фамилия Имя",
+  "language": "C++17",
+  "build": "g++ -O2 -std=c++17 -o restore main.cpp",
+  "run": "./restore"
+}
