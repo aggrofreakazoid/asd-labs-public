@@ -1,0 +1,5 @@
+K 0
+TRAIN
+ham || x
+QUERY
+x

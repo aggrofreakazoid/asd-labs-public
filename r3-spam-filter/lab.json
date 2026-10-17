@@ -1,0 +1,17 @@
+{
+  "id": "r3",
+  "title": "Спам-фильтр: хеш-таблица и k ближайших",
+  "io": "args",
+  "arg_template": ["--method", "{method}", "{in}", "{out}"],
+  "runs": [{"method": "sort"}, {"method": "heap"}, {"method": "select"}],
+  "compare": "tokens",
+  "run_timeout_sec": 10,
+  "build_timeout_sec": 120,
+  "tests_public": "tests/public",
+  "tests_robustness": "tests/robustness",
+  "bench": {
+    "generator": "gen.py",
+    "sizes": [5000, 10000, 20000, 40000, 80000, 160000],
+    "expected": "n"
+  }
+}

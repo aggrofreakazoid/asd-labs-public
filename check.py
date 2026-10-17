@@ -213,6 +213,16 @@ def first_diff_line(exp, got):
 
 # ------------------------------------------------------------------ прогоны
 
+def lab_runs(lab):
+    """Наборы параметров запуска из lab.json (поле runs, например
+    [{"method": "sort"}, {"method": "heap"}] у р3): каждый тест гоняется
+    по разу на набор, значения подставляются в arg_template. Без runs —
+    один запуск без параметров."""
+    return lab.get("runs") or [{}]
+
+def run_label(run):
+    return f" [{' '.join(str(v) for v in run.values())}]" if run else ""
+
 def collect_cases(tests_dir, extra_inputs=None):
     """Тройки (NN.in, NN.out, extras) в каталоге, по возрастанию имени.
 
@@ -243,7 +253,8 @@ def run_public(manifest, lab, root, workdir, tests_dir, tmp):
     if not cases:
         note(f"в {tests_dir} нет тестов вида NN.in/NN.out")
         return 0, 0
-    head(f"Публичные тесты ({len(cases)})")
+    runs = lab_runs(lab)
+    head(f"Публичные тесты ({len(cases) * len(runs)})")
     ok = 0
     timeout = lab.get("run_timeout_sec", 10)
     mode = lab.get("compare", "tokens")
@@ -253,29 +264,34 @@ def run_public(manifest, lab, root, workdir, tests_dir, tmp):
         checker[0] = str((root / checker[0]).resolve())
     timeouts = 0
     for inp, exp, extras in cases:
+        for run in runs:
+            if timeouts >= 3:
+                break
+            name = inp.name + run_label(run)
+            produced = tmp / (inp.stem + ".produced")
+            status, detail = run_once(manifest, lab, workdir, inp, produced, timeout, {**extras, **run})
+            if status != "ok":
+                failed(f"{name}: {detail}")
+                timeouts = timeouts + 1 if status == "timeout" else 0
+                continue
+            timeouts = 0
+            good, why = compare(exp, produced, mode, checker, workdir, inp)
+            if good:
+                passed(name); ok += 1
+            else:
+                failed(f"{name}: {why}")
         if timeouts >= 3:
             note("три таймаута подряд — прекращаю прогон, вероятно бесконечный цикл")
             break
-        produced = tmp / (inp.stem + ".produced")
-        status, detail = run_once(manifest, lab, workdir, inp, produced, timeout, extras)
-        if status != "ok":
-            failed(f"{inp.name}: {detail}")
-            timeouts = timeouts + 1 if status == "timeout" else 0
-            continue
-        timeouts = 0
-        good, why = compare(exp, produced, mode, checker, workdir, inp)
-        if good:
-            passed(inp.name); ok += 1
-        else:
-            failed(f"{inp.name}: {why}")
-    return ok, len(cases)
+    return ok, len(cases) * len(runs)
 
 def run_robustness(manifest, lab, workdir, rob_dir, tmp):
     inputs = sorted(Path(rob_dir).glob("*.in"))
     if not inputs:
         note(f"в {rob_dir} нет входов устойчивости")
         return 0, 0
-    head(f"Устойчивость к враждебному вводу ({len(inputs)})")
+    runs = lab_runs(lab)
+    head(f"Устойчивость к враждебному вводу ({len(inputs) * len(runs)})")
     note("программа обязана не падать и не зависать: допустим любой аккуратный выход,")
     note("недопустимы аварийное завершение сигналом и превышение лимита времени.")
     extra_inputs = lab.get("extra_inputs") or {}
@@ -293,14 +309,16 @@ def run_robustness(manifest, lab, workdir, rob_dir, tmp):
         if missing:
             note(f"{inp.name}: нет сопутствующего файла, пропускаю")
             continue
-        produced = tmp / (inp.stem + ".produced")
-        status, detail = run_once(manifest, lab, workdir, inp, produced, timeout, extras)
-        if status in ("ok", "runerror"):
-            passed(f"{inp.name}: пережила ({detail if status=='runerror' else 'штатно'})")
-            ok += 1
-        else:
-            failed(f"{inp.name}: {detail}")
-    return ok, len(inputs)
+        for run in runs:
+            name = inp.name + run_label(run)
+            produced = tmp / (inp.stem + ".produced")
+            status, detail = run_once(manifest, lab, workdir, inp, produced, timeout, {**extras, **run})
+            if status in ("ok", "runerror"):
+                passed(f"{name}: пережила ({detail if status=='runerror' else 'штатно'})")
+                ok += 1
+            else:
+                failed(f"{name}: {detail}")
+    return ok, len(inputs) * len(runs)
 
 def run_bench(manifest, lab, root, workdir, tmp):
     bench = lab.get("bench")
@@ -318,6 +336,7 @@ def run_bench(manifest, lab, root, workdir, tmp):
     note("это грубая проверка формы кривой по времени всего процесса, включая старт;")
     note("она не заменяет замеров внутри программы по протоколу курса.")
     timeout = lab.get("run_timeout_sec", 10) * 6
+    runs = lab_runs(lab)
     print(f"\n  {'n':>10}  {'время, с':>10}  {'t/f(n)':>12}")
     prev = None
     import math
@@ -332,21 +351,22 @@ def run_bench(manifest, lab, root, workdir, tmp):
             note(f"генератор не найден: {e}")
             continue
         inp.write_text(r.stdout, encoding="utf-8")
-        best = None
-        for _ in range(3):
-            out = tmp / f"bench_{n}.produced"
-            t0 = time.perf_counter()
-            status, _d = run_once(manifest, lab, workdir, inp, out, timeout)
-            dt = time.perf_counter() - t0
-            if status != "ok":
-                print(f"  {n:>10}  {C.warn}{status}{C.off}")
-                best = None
-                break
-            best = dt if best is None else min(best, dt)
-        if best is None:
-            continue
-        ratio = best / f(n) * 1e6
-        print(f"  {n:>10}  {best:>10.4f}  {ratio:>12.3f}")
+        for run in runs:
+            best = None
+            for _ in range(3):
+                out = tmp / f"bench_{n}.produced"
+                t0 = time.perf_counter()
+                status, _d = run_once(manifest, lab, workdir, inp, out, timeout, run)
+                dt = time.perf_counter() - t0
+                if status != "ok":
+                    print(f"  {n:>10}  {C.warn}{status}{C.off}{run_label(run)}")
+                    best = None
+                    break
+                best = dt if best is None else min(best, dt)
+            if best is None:
+                continue
+            ratio = best / f(n) * 1e6
+            print(f"  {n:>10}  {best:>10.4f}  {ratio:>12.3f}{run_label(run)}")
     note(f"\nгипотеза роста f(n) = {expected}: если столбец t/f(n) примерно постоянен,")
     note("гипотеза согласуется с замером; если растёт или падает — не согласуется.")
 
