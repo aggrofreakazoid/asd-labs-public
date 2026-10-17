@@ -9,8 +9,8 @@
 - `keygen.py` — ключи для нагрузок А и Б;
 - `gen.py`, `tests/public`, `tests/robustness` — для `check.py`.
 
-    python3 ../check.py hw1-dict          # каждый тест трижды: hash, bst, tree
-    python3 ../check.py hw1-dict --bench  # прикидочные замеры
+    python3 check.py hw1-dict          # каждый тест трижды: hash, bst, tree
+    python3 check.py hw1-dict --bench  # прикидочные замеры
 
 Хеш-таблица из ДЗ1 используется в лабораторной Р3 (`../r3-spam-filter`) —
 поэтому на контрольной точке требуется именно она.

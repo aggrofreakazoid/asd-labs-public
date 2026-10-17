@@ -8,5 +8,5 @@
 - `gen.py` — генератор больших выборок для замеров;
 - `tests/public`, `tests/robustness` — тесты для `check.py`.
 
-    python3 ../check.py r3-spam-filter          # каждый тест трижды: sort, heap, select
-    python3 ../check.py r3-spam-filter --bench  # прикидочные замеры
+    python3 check.py r3-spam-filter          # каждый тест трижды: sort, heap, select
+    python3 check.py r3-spam-filter --bench  # прикидочные замеры
