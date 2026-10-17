@@ -1,0 +1,10 @@
+INSERT banana 3
+INSERT apple 5
+INSERT cherry -2
+FIND apple
+FIND grape
+INSERT apple 7
+SIZE
+ERASE banana
+ERASE banana
+DUMP
