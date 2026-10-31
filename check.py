@@ -262,6 +262,10 @@ def run_public(manifest, lab, root, workdir, tests_dir, tmp):
     if checker:
         checker = split_cmd(checker)
         checker[0] = str((root / checker[0]).resolve())
+        if checker[0].lower().endswith(".py"):
+            # Windows не запускает .py напрямую (WinError 193): shebang там
+            # не работает, поэтому вызываем через тот же интерпретатор.
+            checker.insert(0, sys.executable)
     timeouts = 0
     for inp, exp, extras in cases:
         for run in runs:

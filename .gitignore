@@ -8,7 +8,6 @@ solution
 *.exe
 __pycache__/
 *.pyc
-r2-bmp-sort/tools/bmpshuffle/bmpshuffle
 
 # решение студента (создаётся локально, не коммитится в шаблон)
 solution.json
@@ -24,8 +23,9 @@ program.md
 # генератор р2 — выдаёт готовую реализацию чтения/записи BMP (это сами
 # студенты обязаны написать самостоятельно); раздаются только результаты
 # его работы (shuffled.bmp + keys.txt), не исходники и не бинарник
-r2-bmp-sort/tools/bmpshuffle/*.go
-r2-bmp-sort/tools/bmpshuffle/go.*
+# (чекер публичных тестов — r2-bmp-sort/check_restore.py, на чистом Python,
+# от bmpshuffle не зависит)
+r2-bmp-sort/tools/
 r2-bmp-sort/orig-c-generator/
 
 # эталоны р2 — исходные (неперемешанные) изображения для реальных
