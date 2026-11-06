@@ -1,0 +1,6 @@
+{
+  "author": "Фамилия Имя",
+  "language": "C++17",
+  "build": "g++ -O2 -std=c++17 -o solution main.cpp",
+  "run": "./solution"
+}

@@ -1,0 +1,11 @@
+K 2
+TRAIN
+ham ||	ЁЛКА ёлка Ёлка, ПрИвЕт!!!
+spam || SALE75 sale75 скидка-90% 1990₽ №57
+phish || e-mail: Admin@Bank.ru; пароль/логин
+ham || сЕрвер — ok,ok;OK
+QUERY
+ёлка ЁЛКА елка привет
+Sale75 СКИДКА 90 57
+admin bank ru пароль логин e mail
+OK сервер

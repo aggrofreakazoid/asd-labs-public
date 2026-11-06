@@ -1,0 +1,6 @@
+K 1000000000
+TRAIN
+ham || x
+spam || y
+QUERY
+x
